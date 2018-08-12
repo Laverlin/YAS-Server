@@ -1,6 +1,6 @@
 ﻿export class Route {
 
-    public RouteId: number;
+    public RouteId: string;
     public RouteDate: Date;
     public RouteName: string;
     public WayPoints: WayPoint[];

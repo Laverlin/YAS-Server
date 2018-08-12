@@ -1,7 +1,8 @@
 ﻿import TelegramBot = require('node-telegram-bot-api');
-const request = require('request');
-const xml2js = require('xml2js');
-const env = require('dotenv');
+import request = require('request');
+import xml2js = require('xml2js');
+import env = require('dotenv');
+import express = require('express');
 
 import { UserInfo } from "./UserInfo";
 import { Route } from "./Route";
@@ -11,7 +12,7 @@ import { DbMongo } from './DbMongo';
 
 // Constants
 //
-var conf = env.config();
+let conf = env.config();
 const TELEGRAM_TOKEN = process.env.TELEGRAM_API_KEY;
 const MONGO_VARIABLE = 'MONGO_PORT_27017_TCP_ADDR'
 const MONGO_DEFAULT_SERVER = 'localhost'
@@ -19,10 +20,7 @@ const MONGO_DEFAULT_SERVER = 'localhost'
 // Init
 //
 let telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
-let addr: string = process.env[MONGO_VARIABLE] || MONGO_DEFAULT_SERVER;
-let dbMongo = new DbMongo("mongodb://" + addr + ":27017/");
-
-
+let connectionString: string = `mongodb://${process.env[MONGO_VARIABLE] || MONGO_DEFAULT_SERVER}:27017/`;
 
 // Extracts UserInfo from TelegramBot.Message class
 //
@@ -66,6 +64,7 @@ telegramBot.onText(/Download it:([^;]+)/i, (inMessage, match) => {
                         console.log(wayPoint);
                     }
                 route.RouteName = `${route.WayPoints[0].PointName} to ${route.WayPoints[route.WayPoints.length - 1].PointName}`;
+                let dbMongo = new DbMongo(connectionString);
                 dbMongo.AddRoute(route, inMessage.from.id);
                 outMessage = `Route ${route.RouteName} (${route.WayPoints.length} way points) has been found`;
                 telegramBot.sendMessage(inMessage.chat.id, outMessage);
@@ -89,3 +88,16 @@ telegramBot.on("text", (message) => {
 });
 
 
+const restServer = express();
+const port = 3000;
+const router = express.Router();
+
+restServer.use('/garminapi', router);
+router.get('/routelist/:userid', (request, response) => {
+    let userId: string = request.params.userid;
+    let dbMongo = new DbMongo(connectionString);
+    dbMongo.GetRouteList(userId)
+        .then(routeList => response.send(routeList));
+ });
+
+restServer.listen(port, () => console.log(`Listening on port ${port}`));
