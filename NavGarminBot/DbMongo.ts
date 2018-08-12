@@ -49,13 +49,15 @@ export class DbMongo {
         this.closeDb();
     }
 
+    // Get list of routes for specific user
+    //
     async GetRouteList(userId: string): Promise<any> {
         let routes = await this.getRoutes();
 
         let routeList =new Array<Route>();
         let routeUser: RouteUser = await routes.findOne({ UserId: userId });
         if (!isNullOrUndefined(routeUser))
-            routeList = routeUser.Routes;
+            routeList = routeUser.Routes.sort(function (a, b) { return b.RouteDate.valueOf() - a.RouteDate.valueOf() });
 
         this.closeDb();
         return routeList;
