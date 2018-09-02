@@ -18,7 +18,7 @@ sudo docker build -t $IMAGE_NAME .
 sudo docker images $IMAGE_NAME
 
 echo ".. run container :: $CONTAINER_NAME"
-sudo docker run -d -p 3000:3000/tcp --name $CONTAINER_NAME --link flat-mongo:mongo $IMAGE_NAME
+sudo docker run -d -m 150m -p 3000:3000/tcp --name $CONTAINER_NAME --link flat-mongo:mongo $IMAGE_NAME
 
 cd ..
 echo 'done.'
