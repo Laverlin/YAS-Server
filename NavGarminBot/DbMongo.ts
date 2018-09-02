@@ -28,7 +28,7 @@ export class DbMongo {
 
     // Add route to db
     //
-    async AddRoute(route: Route, telegramId : number) {
+    async AddRoute(route: Route, telegramId : number):Promise<string> {
 
         let routes = await this.getRoutes();
         let routeUser: RouteUser = await routes.findOne({ TelegramUserId: telegramId });
@@ -47,14 +47,16 @@ export class DbMongo {
         await routes.update({ UserId: routeUser.UserId }, routeUser, { upsert: true });
 
         this.closeDb();
+
+        return routeUser.UserId;
     }
 
     // Get list of routes for specific user
     //
-    async GetRouteList(userId: string): Promise<any> {
+    async GetRouteList(userId: string): Promise<Array<Route>> {
         let routes = await this.getRoutes();
 
-        let routeList =new Array<Route>();
+        let routeList = new Array<Route>();
         let routeUser: RouteUser = await routes.findOne({ UserId: userId });
         if (!isNullOrUndefined(routeUser))
             routeList = routeUser.Routes.sort(function (a, b) { return b.RouteDate.valueOf() - a.RouteDate.valueOf() });

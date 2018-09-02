@@ -54,20 +54,24 @@ telegramBot.onText(/Download it:([^;]+)/i, (inMessage, match) => {
             }
 
             try {
-                let route = new Route('Route ');
+                let route = new Route('Route');
                 let placemarks = result['kml']['Document'][0]['Placemark'];
                 for (let i = 0; i < placemarks.length; i++)
                     if (placemarks[i]['styleUrl'] != '#RouteStyle') {
                         let points = placemarks[i]['Point'][0]['coordinates'][0].split(',');
-                        let wayPoint = new WayPoint(placemarks[i]['name'][0], points[0], points[1]);
+                        let wayPoint = new WayPoint(placemarks[i]['name'][0], points[1], points[0]);
                         route.WayPoints.push(wayPoint);
                         console.log(wayPoint);
                     }
-                route.RouteName = `${route.WayPoints[0].PointName} to ${route.WayPoints[route.WayPoints.length - 1].PointName}`;
+
+                //route.RouteName += `${route.WayPoints[0].PointName} `;
                 let dbMongo = new DbMongo(connectionString);
-                dbMongo.AddRoute(route, inMessage.from.id);
-                outMessage = `Route ${route.RouteName} (${route.WayPoints.length} way points) has been found`;
-                telegramBot.sendMessage(inMessage.chat.id, outMessage);
+                dbMongo.AddRoute(route, inMessage.from.id)
+                    .then(userId => {
+                        outMessage = `Route ${route.RouteName} (${route.WayPoints.length} way points) has been upload \n userId:${userId}`;
+                        telegramBot.sendMessage(inMessage.chat.id, outMessage);
+                    });
+
                 console.log(route);
             }
             catch(error){
@@ -95,6 +99,7 @@ const router = express.Router();
 restServer.use('/garminapi', router);
 router.get('/routelist/:userid', (request, response) => {
     let userId: string = request.params.userid;
+    console.log("get request for " + userId);
     let dbMongo = new DbMongo(connectionString);
     dbMongo.GetRouteList(userId)
         .then(routeList => response.send(routeList));
