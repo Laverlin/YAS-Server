@@ -137,4 +137,23 @@ export class DbMongo {
         this.closeDb();
         return routeList;
     }
+
+    public async GetUserId(telegramId): Promise<string> {
+
+        let userId = "";
+
+        let routes = await this.getRoutes();
+        let routeUser: RouteUser = await routes.findOne({ TelegramUserId: telegramId });
+        if (isNullOrUndefined(routeUser)) {
+            routeUser = new RouteUser();
+            routeUser.TelegramUserId = telegramId;
+            routeUser.UserId = ShortId.generate();
+            routeUser.PublicUserId = ShortId.generate();
+            routeUser.Routes = new Array<Route>();
+            await routes.insert(routeUser);
+        }
+
+        this.closeDb();
+        return routeUser.UserId;
+    }
 }

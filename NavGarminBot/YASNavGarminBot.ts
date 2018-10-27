@@ -32,6 +32,11 @@ export async function RunBot(telegramToken: string, connectionString: string) {
 
     let telegramBot = new TelegramBot(telegramToken, { polling: true });
 
+    telegramBot.onText(/Start/i, async (inMessage, match) => {
+        let outMessage = "/myid `- return user ID`\n\n/list `- route list `\n\n /rename <new name> `- rename last uploaded route`\n\n /rename:<id> <new name> `- rename route with <id>`\n\n /delete:<id> `delete route with <id>`";
+        telegramBot.sendMessage(inMessage.chat.id, outMessage, { parse_mode: "Markdown" });
+    })
+
     // Download route from Navionics
     //
     telegramBot.onText(/Download it:([^;]+)/i, async (inMessage, match) => {
@@ -76,14 +81,14 @@ export async function RunBot(telegramToken: string, connectionString: string) {
 
     // return list of routes
     //
-    telegramBot.onText(/Routes/i, (inMessage, match) => {
+    telegramBot.onText(/list/i, (inMessage, match) => {
 
         let dbMongo = new DbMongo(connectionString);
         dbMongo.GetRouteListByTeleId(inMessage.from.id)
             .then(routeList => {
                 let outMessage = "";
                 if (isNullOrUndefined(routeList) || routeList.length < 1) {
-                    outMessage = "route list is empty";
+                    outMessage = "there is no routes here";
                 }
                 else {
                     for (let i = 0; i < routeList.length; i++) {
@@ -137,6 +142,16 @@ export async function RunBot(telegramToken: string, connectionString: string) {
         telegramBot.sendMessage(inMessage.chat.id, outMessage);
 
     });
+
+    telegramBot.onText(/myid/i, async (inMessage, match) => {
+        let outMessage = "";
+
+        let dbMongo = new DbMongo(connectionString);
+        let result = await dbMongo.GetUserId(inMessage.from.id);
+        outMessage = result;
+        telegramBot.sendMessage(inMessage.chat.id, outMessage);
+
+    })
 
     // Log incoming requests
     //
