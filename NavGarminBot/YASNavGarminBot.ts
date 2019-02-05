@@ -12,8 +12,8 @@ import { DbMongo } from './DbMongo';
 // Error handling
 //
 function processError(telegramBot: TelegramBot, chatId: number, url: string, error: string) {
-    console.log('request error:', error);
-    console.log('request url:', url);
+    console.log((new Date()).toUTCString() + ' :: request error:', error);
+    console.log((new Date()).toUTCString() + ' :: request url:', url);
     let outMessage = `unable to get data from ${url}\n error: ${error}`;
     telegramBot.sendMessage(chatId, outMessage);
 }
@@ -26,6 +26,40 @@ function ExtractUser(inMessage: TelegramBot.Message): UserInfo {
     return userInfo;
 }
 
+function parseKmlResponse(response, telegramBot, chatId, match, connectionString) {
+    if (!response.includes(`<kml xmlns="http://www.opengis.net/kml/2.2">`)) { return; }
+
+    let parser = new xml2js.Parser();
+    parser.parseString(response, async function (error, result) {
+
+        if (!isNullOrUndefined(error)) {
+            processError(telegramBot, chatId, match, error);
+            return;
+        }
+
+        try {
+            let route = new Route('Route');
+            let placemarks = result['kml']['Document'][0]['Placemark'];
+            for (let i = 0; i < placemarks.length; i++)
+                if (placemarks[i]['styleUrl'] != '#RouteStyle') {
+                    let points = placemarks[i]['Point'][0]['coordinates'][0].split(',');
+                    let wayPoint = new WayPoint(placemarks[i]['name'][0], points[1], points[0]);
+                    route.WayPoints.push(wayPoint);
+                }
+
+            let dbMongo = new DbMongo(connectionString);
+            let userId = await dbMongo.AddRoute(route, chatId)
+            let outMessage = `${route.RouteName} (${route.WayPoints.length} way points) has been uploaded \n userId:${userId}`;
+            telegramBot.sendMessage(chatId, outMessage);
+            console.log(outMessage);
+
+        }
+        catch (error) {
+            processError(telegramBot, chatId, match, error);
+        }
+    });
+}
+
 // Run bot and process user requests
 //
 export async function RunBot(telegramToken: string, connectionString: string) {
@@ -33,7 +67,7 @@ export async function RunBot(telegramToken: string, connectionString: string) {
     let telegramBot = new TelegramBot(telegramToken, { polling: true });
 
     telegramBot.onText(/Start/i, async (inMessage, match) => {
-        let outMessage = "/myid `- return user ID`\n\n/list `- route list `\n\n /rename <new name> `- rename last uploaded route`\n\n /rename:<id> <new name> `- rename route with <id>`\n\n /delete:<id> `delete route with <id>`";
+        let outMessage = "/myid `- return ID-string to identify your routes`\n\n/list `- route list `\n\n /rename <new name> `- rename last uploaded route`\n\n /rename:<id> <new name> `- set <new name> to route with <id>`\n\n /delete:<id> `delete route with <id>`";
         telegramBot.sendMessage(inMessage.chat.id, outMessage, { parse_mode: "Markdown" });
     })
 
@@ -43,36 +77,18 @@ export async function RunBot(telegramToken: string, connectionString: string) {
 
         let response = request(match[1])
             .then(function (response) {
+                parseKmlResponse(response, telegramBot, inMessage.chat.id, match[1], connectionString)
+             })
+            .catch(function (error) {
+                processError(telegramBot, inMessage.chat.id, match[1], error.name + ", code:" + error.statusCode);
+            });
+    });
 
-                let parser = new xml2js.Parser();
-                parser.parseString(response, async function (error, result) {
+    telegramBot.onText(/^http:\/\/tinyurl.com([^;]+)/i, async (inMessage, match) => {
 
-                    if (!isNullOrUndefined(error)) {
-                        processError(telegramBot, inMessage.chat.id, match[1], error);
-                        return;
-                    }
-
-                    try {
-                        let route = new Route('Route');
-                        let placemarks = result['kml']['Document'][0]['Placemark'];
-                        for (let i = 0; i < placemarks.length; i++)
-                            if (placemarks[i]['styleUrl'] != '#RouteStyle') {
-                                let points = placemarks[i]['Point'][0]['coordinates'][0].split(',');
-                                let wayPoint = new WayPoint(placemarks[i]['name'][0], points[1], points[0]);
-                                route.WayPoints.push(wayPoint);
-                            }
-
-                        let dbMongo = new DbMongo(connectionString);
-                        let userId = await dbMongo.AddRoute(route, inMessage.from.id)
-                        let outMessage = `${route.RouteName} (${route.WayPoints.length} way points) has been upload \n userId:${userId}`;
-                        telegramBot.sendMessage(inMessage.chat.id, outMessage);
-                        console.log(outMessage);
-
-                    }
-                    catch (error) {
-                        processError(telegramBot, inMessage.chat.id, match[1], error);
-                    }
-                });
+        let response = request("http://tinyurl.com" + match[1])
+            .then(function (response) {
+                parseKmlResponse(response, telegramBot, inMessage.chat.id, match[1], connectionString)
             })
             .catch(function (error) {
                 processError(telegramBot, inMessage.chat.id, match[1], error.name + ", code:" + error.statusCode);
@@ -95,7 +111,8 @@ export async function RunBot(telegramToken: string, connectionString: string) {
                         outMessage += "*" + routeList[i].RouteId + "* : `" + routeList[i].RouteName + "\n(" + routeList[i].RouteDate.toDateString() + ")`\n\n";
                     }
                 }
-                telegramBot.sendMessage(inMessage.chat.id, outMessage, { parse_mode: "Markdown"});
+                telegramBot.sendMessage(inMessage.chat.id, outMessage, { parse_mode: "Markdown" });
+                console.log(`\t => ${outMessage}`);
             });
     });
 
@@ -109,6 +126,7 @@ export async function RunBot(telegramToken: string, connectionString: string) {
         if (!result)
             outMessage = "nothing to rename ";
         telegramBot.sendMessage(inMessage.chat.id, outMessage);
+        console.log(`\t => ${outMessage}`);
     });
 
     // rename appointed route
@@ -125,6 +143,7 @@ export async function RunBot(telegramToken: string, connectionString: string) {
         else
             outMessage = "cannot find route id: " + routeId;
         telegramBot.sendMessage(inMessage.chat.id, outMessage);
+        console.log(`\t => ${outMessage}`);
     });
 
     // rename appointed route
@@ -140,6 +159,7 @@ export async function RunBot(telegramToken: string, connectionString: string) {
         else
             outMessage = "cannot find route id: " + match[1];
         telegramBot.sendMessage(inMessage.chat.id, outMessage);
+        console.log(`\t => ${outMessage}`);
 
     });
 
@@ -150,6 +170,7 @@ export async function RunBot(telegramToken: string, connectionString: string) {
         let result = await dbMongo.GetUserId(inMessage.from.id);
         outMessage = result;
         telegramBot.sendMessage(inMessage.chat.id, outMessage);
+        console.log(`\t => ${outMessage}`);
 
     })
 
@@ -157,8 +178,8 @@ export async function RunBot(telegramToken: string, connectionString: string) {
     //
     telegramBot.on("text", (message) => {
         let userInfo = ExtractUser(message);
-        let logMessage = ` chatId : ${message.chat.id}\n from : [${userInfo.UserId}] ${userInfo.UserName}\n message : ${message.text}`;
+        let logMessage = `${(new Date()).toUTCString()} :: from : [${userInfo.UserId}] ${userInfo.UserName}\n\t message : ${message.text}`;
         console.log(logMessage);
+
     });
 }
-

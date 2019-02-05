@@ -35,17 +35,19 @@ router.get('/routelist', (request, response) => {
 
 router.get('/routelist/:userid', (request, response) => {
     let userId: string = request.params.userid;
-    console.log("get request for " + userId);
+    let ts = new Date();
+    console.log(ts.toUTCString() + " get watch request for " + userId);
     let dbMongo = new DbMongo(connectionString);
     dbMongo.GetRouteListByUserId(userId)
         .then(routeList => {
-            if (routeList == null || routeList.length == 0) {
-                response.sendStatus(991);
-            }
-            else {
+   //         if (routeList == null || routeList.length == 0) {
+   //             response.sendStatus(991);
+   //         }
+   //         else {
                 response.send(routeList);
-            }
+         //   }
         });
  });
 
-restServer.listen(port, () => console.log(`Listening on port ${port}`));
+let utcTime = (new Date()).toUTCString();
+restServer.listen(port, () => console.log(`${utcTime} Listening on port ${port}`));
