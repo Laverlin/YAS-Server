@@ -27,6 +27,7 @@ function ExtractUser(inMessage: TelegramBot.Message): UserInfo {
 }
 
 function parseKmlResponse(response, telegramBot, chatId, match, connectionString) {
+
     if (!response.includes(`<kml xmlns="http://www.opengis.net/kml/2.2">`)) { return; }
 
     let parser = new xml2js.Parser();

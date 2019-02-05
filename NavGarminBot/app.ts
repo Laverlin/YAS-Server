@@ -36,16 +36,15 @@ router.get('/routelist', (request, response) => {
 router.get('/routelist/:userid', (request, response) => {
     let userId: string = request.params.userid;
     let ts = new Date();
-    console.log(ts.toUTCString() + " get watch request for " + userId);
+    console.log(ts.toUTCString() + " watch request for " + userId);
     let dbMongo = new DbMongo(connectionString);
     dbMongo.GetRouteListByUserId(userId)
         .then(routeList => {
-   //         if (routeList == null || routeList.length == 0) {
-   //             response.sendStatus(991);
-   //         }
-   //         else {
-                response.send(routeList);
-         //   }
+            response.send(routeList);
+            if (!isNullOrUndefined(routeList))
+                console.log(`\t ${routeList.length} routes sended`);
+            else
+                console.log(`\t there is no routes for this user id`);
         });
  });
 
