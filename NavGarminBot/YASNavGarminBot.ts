@@ -67,6 +67,8 @@ export async function RunBot(telegramToken: string, connectionString: string) {
 
     let telegramBot = new TelegramBot(telegramToken, { polling: true });
 
+    let kmlUrlPattern = /(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/)(tinyurl.com|social-sharing.navionics.io)(:[0-9]{1,5})?(\/.*)?$/igm;
+
     telegramBot.onText(/Start/i, async (inMessage, match) => {
         let outMessage = "/myid `- return ID-string to identify your routes`\n\n/list `- route list `\n\n /rename <new name> `- rename last uploaded route`\n\n /rename:<id> <new name> `- set <new name> to route with <id>`\n\n /delete:<id> `delete route with <id>`";
         telegramBot.sendMessage(inMessage.chat.id, outMessage, { parse_mode: "Markdown" });
@@ -74,27 +76,39 @@ export async function RunBot(telegramToken: string, connectionString: string) {
 
     // Download route from Navionics
     //
-    telegramBot.onText(/Download it:([^;]+)/i, async (inMessage, match) => {
+    telegramBot.onText(kmlUrlPattern, async (inMessage, match) => {
 
-        let response = request(match[1])
-            .then(function (response) {
-                parseKmlResponse(response, telegramBot, inMessage.chat.id, match[1], connectionString)
-             })
-            .catch(function (error) {
-                processError(telegramBot, inMessage.chat.id, match[1], error.name + ", code:" + error.statusCode);
-            });
+        let urls = inMessage.text.match(kmlUrlPattern);
+
+        urls.forEach((url) => {
+            request(url)
+                .then(function (response) {
+                    parseKmlResponse(response, telegramBot, inMessage.chat.id, url, connectionString)
+                })
+                .catch(function (error) {
+                    processError(telegramBot, inMessage.chat.id, url, error.name + ", code:" + error.statusCode);
+                });
+        });
+
+        //let response = request(match[1])
+        //    .then(function (response) {
+        //        parseKmlResponse(response, telegramBot, inMessage.chat.id, match[1], connectionString)
+        //     })
+        //    .catch(function (error) {
+        //        processError(telegramBot, inMessage.chat.id, match[1], error.name + ", code:" + error.statusCode);
+        //    });
     });
 
-    telegramBot.onText(/^http:\/\/tinyurl.com([^;]+)/i, async (inMessage, match) => {
-
-        let response = request("http://tinyurl.com" + match[1])
-            .then(function (response) {
-                parseKmlResponse(response, telegramBot, inMessage.chat.id, match[1], connectionString)
-            })
-            .catch(function (error) {
-                processError(telegramBot, inMessage.chat.id, match[1], error.name + ", code:" + error.statusCode);
-            });
-    });
+    //telegramBot.onText(/^http:\/\/tinyurl.com([^;]+)/i, async (inMessage, match) => {
+//
+//        let response = request("http://tinyurl.com" + match[1])
+//            .then(function (response) {
+//                parseKmlResponse(response, telegramBot, inMessage.chat.id, match[1], connectionString)
+//            })
+//            .catch(function (error) {
+//                processError(telegramBot, inMessage.chat.id, match[1], error.name + ", code:" + error.statusCode);
+//            });
+  //  });
 
     // return list of routes
     //
@@ -178,6 +192,9 @@ export async function RunBot(telegramToken: string, connectionString: string) {
     // Log incoming requests
     //
     telegramBot.on("text", (message) => {
+
+
+
         let userInfo = ExtractUser(message);
         let logMessage = `${(new Date()).toUTCString()} :: from : [${userInfo.UserId}] ${userInfo.UserName}\n\t message : ${message.text}`;
         console.log(logMessage);
