@@ -41,12 +41,22 @@ function parseKmlResponse(response, telegramBot, chatId, match, connectionString
         try {
             let route = new Route('Route');
             let placemarks = result['kml']['Document'][0]['Placemark'];
-            for (let i = 0; i < placemarks.length; i++)
-                if (placemarks[i]['styleUrl'] != '#RouteStyle') {
-                    let points = placemarks[i]['Point'][0]['coordinates'][0].split(',');
-                    let wayPoint = new WayPoint(placemarks[i]['name'][0], points[1], points[0]);
+            if (placemarks.length > 1) {
+                for (let i = 0; i < placemarks.length; i++)
+                    if (placemarks[i]['styleUrl'] != '#RouteStyle') {
+                        let points = placemarks[i]['Point'][0]['coordinates'][0].split(',');
+                        let wayPoint = new WayPoint(placemarks[i]['name'][0], points[1], points[0]);
+                        route.WayPoints.push(wayPoint);
+                    }
+            } else {
+                let route = new Route(placemarks[0]['ExtendedData'][0]['Data'][0]['value'][0]);
+                let coords = placemarks[0]['LineString'][0]['coordinates'][0].split(' ');
+                for (let i = 0; i < coords.length; i++) {
+                    let points = coords[i].split(',');
+                    let wayPoint = new WayPoint('WP-' + i.toString(), points[1], points[0]);
                     route.WayPoints.push(wayPoint);
                 }
+            }
 
             let dbMongo = new DbMongo(connectionString);
             let userId = await dbMongo.AddRoute(route, chatId)
