@@ -9,6 +9,8 @@ import { WayPoint } from "./Route";
 import { isNullOrUndefined } from 'util';
 import { DbMongo } from './DbMongo';
 
+const https = require('https');
+
 // Error handling
 //
 function processError(telegramBot: TelegramBot, chatId: number, url: string, error: string) {
@@ -49,7 +51,7 @@ function parseKmlResponse(response, telegramBot, chatId, match, connectionString
                         route.WayPoints.push(wayPoint);
                     }
             } else {
-                let route = new Route(placemarks[0]['ExtendedData'][0]['Data'][0]['value'][0]);
+                route = new Route(placemarks[0]['ExtendedData'][0]['Data'][0]['value'][0]);
                 let coords = placemarks[0]['LineString'][0]['coordinates'][0].split(' ');
                 for (let i = 0; i < coords.length; i++) {
                     let points = coords[i].split(',');
@@ -99,26 +101,28 @@ export async function RunBot(telegramToken: string, connectionString: string) {
                     processError(telegramBot, inMessage.chat.id, url, error.name + ", code:" + error.statusCode);
                 });
         });
-
-        //let response = request(match[1])
-        //    .then(function (response) {
-        //        parseKmlResponse(response, telegramBot, inMessage.chat.id, match[1], connectionString)
-        //     })
-        //    .catch(function (error) {
-        //        processError(telegramBot, inMessage.chat.id, match[1], error.name + ", code:" + error.statusCode);
-        //    });
     });
 
-    //telegramBot.onText(/^http:\/\/tinyurl.com([^;]+)/i, async (inMessage, match) => {
-//
-//        let response = request("http://tinyurl.com" + match[1])
-//            .then(function (response) {
-//                parseKmlResponse(response, telegramBot, inMessage.chat.id, match[1], connectionString)
-//            })
-//            .catch(function (error) {
-//                processError(telegramBot, inMessage.chat.id, match[1], error.name + ", code:" + error.statusCode);
-//            });
-  //  });
+    // Download route from Navionics - new api
+    //
+    telegramBot.onText(/https:\/\/boating.page.link([^;]+)/i, async (inMessage, match) => {
+
+        https.get(inMessage.text, (resp) => {
+
+            const { statusCode } = resp;
+            let url = resp.headers['location'];
+            if (statusCode == 302) {
+                let addr = url.match(kmlUrlPattern)[0];
+                request(addr)
+                    .then(function (response) {
+                        parseKmlResponse(response, telegramBot, inMessage.chat.id, addr, connectionString)
+                    })
+                    .catch(function (error) {
+                        processError(telegramBot, inMessage.chat.id, addr, error.name + ", code:" + error.statusCode);
+                    });
+            }
+        });
+    });
 
     // return list of routes
     //
