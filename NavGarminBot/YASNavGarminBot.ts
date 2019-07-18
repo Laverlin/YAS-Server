@@ -124,6 +124,45 @@ export async function RunBot(telegramToken: string, connectionString: string) {
         });
     });
 
+    // process gpx file
+    //
+    telegramBot.on('document', (message) => {
+
+        let id = message.document.file_id;
+        let fileName = message.document.file_name;
+
+        if (fileName.endsWith('.gpx')) {
+
+            let parser = new xml2js.Parser();
+            let link = telegramBot.getFileLink(id)
+                .then(link => {
+                    request(link.toString())
+                        .then(response => {
+                            parser.parseString(response, async function (error, result) {
+
+                                let routeData = result['gpx']['rte'][0];
+                                let name = routeData['name'][0];
+                                let route = new Route(name);
+                                for (let i = 0; i < routeData['rtept'].length; i++) {
+                                    let wayPoint = new WayPoint(routeData['rtept'][i]['name'][0], routeData['rtept'][i].$.lat, routeData['rtept'][i].$.lon);
+                                    route.WayPoints.push(wayPoint);
+                                }
+
+                                let dbMongo = new DbMongo(connectionString);
+                                let userId = await dbMongo.AddRoute(route, message.chatId)
+                                let outMessage = `${route.RouteName} (${route.WayPoints.length} way points) has been uploaded \n userId:${userId}`;
+                                telegramBot.sendMessage(message.chatId, outMessage);
+                                console.log(outMessage);
+
+                            });
+                        })
+                        .catch(function (error) {
+                            processError(telegramBot, message.chat.id, fileName, error.name + ", code:" + error.statusCode);
+                        });
+                });
+        }
+    });
+
     // return list of routes
     //
     telegramBot.onText(/list/i, (inMessage, match) => {
