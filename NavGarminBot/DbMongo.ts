@@ -43,7 +43,7 @@ export class DbMongo {
         routeUser.TotalRoutes += 1;
         route.RouteId = routeUser.TotalRoutes.toString();
         routeUser.Routes.push(route);
-        route.RouteName = route.RouteName + "-" + routeUser.TotalRoutes.toString();
+        route.RouteName = route.RouteName.replace('Route-?', "Route-" + routeUser.TotalRoutes.toString());
 
         await routes.update({ UserId: routeUser.UserId }, routeUser, { upsert: true });
 

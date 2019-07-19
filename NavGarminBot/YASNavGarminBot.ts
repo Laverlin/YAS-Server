@@ -41,7 +41,7 @@ function parseKmlResponse(response, telegramBot, chatId, match, connectionString
         }
 
         try {
-            let route = new Route('Route');
+            let route = new Route('Route-?');
             let placemarks = result['kml']['Document'][0]['Placemark'];
             if (placemarks.length > 1) {
                 for (let i = 0; i < placemarks.length; i++)
@@ -84,7 +84,7 @@ export async function RunBot(telegramToken: string, connectionString: string) {
     telegramBot.onText(/Start/i, async (inMessage, match) => {
         let outMessage = "/myid `- return ID-string to identify your routes`\n\n/list `- route list `\n\n /rename <new name> `- rename last uploaded route`\n\n /rename:<id> <new name> `- set <new name> to route with <id>`\n\n /delete:<id> `delete route with <id>`";
         telegramBot.sendMessage(inMessage.chat.id, outMessage, { parse_mode: "Markdown" });
-    })
+    });
 
     // Download route from Navionics
     //
@@ -110,7 +110,7 @@ export async function RunBot(telegramToken: string, connectionString: string) {
         https.get(inMessage.text, (resp) => {
 
             const { statusCode } = resp;
-            let url = resp.headers['location'];
+            let url : string = resp.headers['location'];
             if (statusCode == 302) {
                 let addr = url.match(kmlUrlPattern)[0];
                 request(addr)
@@ -126,7 +126,7 @@ export async function RunBot(telegramToken: string, connectionString: string) {
 
     // process gpx file
     //
-    telegramBot.on('document', (message) => {
+    telegramBot.on('document', (message: TelegramBot.Message) => {
 
         let id = message.document.file_id;
         let fileName = message.document.file_name;
@@ -149,9 +149,9 @@ export async function RunBot(telegramToken: string, connectionString: string) {
                                 }
 
                                 let dbMongo = new DbMongo(connectionString);
-                                let userId = await dbMongo.AddRoute(route, message.chatId)
+                                let userId = await dbMongo.AddRoute(route, message.chat.id)
                                 let outMessage = `${route.RouteName} (${route.WayPoints.length} way points) has been uploaded \n userId:${userId}`;
-                                telegramBot.sendMessage(message.chatId, outMessage);
+                                telegramBot.sendMessage(message.chat.id, outMessage);
                                 console.log(outMessage);
 
                             });
