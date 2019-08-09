@@ -131,6 +131,10 @@ export async function RunBot(telegramToken: string, connectionString: string) {
         let id = message.document.file_id;
         let fileName = message.document.file_name;
 
+        let userInfo = ExtractUser(message);
+        let logMessage = `${(new Date()).toUTCString()} :: from : [${userInfo.UserId}] ${userInfo.UserName}\n\t get file : ${fileName}`;
+        console.log(logMessage);
+
         if (fileName.endsWith('.gpx')) {
 
             let parser = new xml2js.Parser();
@@ -140,19 +144,56 @@ export async function RunBot(telegramToken: string, connectionString: string) {
                         .then(response => {
                             parser.parseString(response, async function (error, result) {
 
-                                let routeData = result['gpx']['rte'][0];
-                                let name = routeData['name'][0];
-                                let route = new Route(name);
-                                for (let i = 0; i < routeData['rtept'].length; i++) {
-                                    let wayPoint = new WayPoint(routeData['rtept'][i]['name'][0], routeData['rtept'][i].$.lat, routeData['rtept'][i].$.lon);
-                                    route.WayPoints.push(wayPoint);
-                                }
+                                try {
+                                    let route;
 
-                                let dbMongo = new DbMongo(connectionString);
-                                let userId = await dbMongo.AddRoute(route, message.chat.id)
-                                let outMessage = `${route.RouteName} (${route.WayPoints.length} way points) has been uploaded \n userId:${userId}`;
-                                telegramBot.sendMessage(message.chat.id, outMessage);
-                                console.log(outMessage);
+                                    // file from mobile app
+                                    //
+                                    if (result['gpx']['rte'] != null) {
+
+                                        let routeData = result['gpx']['rte'][0];
+                                        let name = routeData['name'] != null ? routeData['name'][0] : '';
+                                        route = new Route(name);
+                                        for (let i = 0; i < routeData['rtept'].length; i++) {
+                                            let wayPoint = new WayPoint(
+                                                routeData['rtept'][i]['name'] != null ? routeData['rtept'][i]['name'][0] : '',
+                                                routeData['rtept'][i].$.lat,
+                                                routeData['rtept'][i].$.lon);
+                                            route.WayPoints.push(wayPoint);
+                                        }
+                                    }
+                                    
+                                    // file from Navionics device
+                                    //
+                                    else if (result['gpx']['wpt'] != null) {
+                                        route = new Route('Route-?');
+                                        for (let i = 0; i < result['gpx']['wpt'].length; i++) {
+                                            let wayPoint = new WayPoint(
+                                                result['gpx']['wpt'][i]['name'] != null ? result['gpx']['wpt'][i]['name'][0] : '',
+                                                result['gpx']['wpt'][i].$.lat,
+                                                result['gpx']['wpt'][i].$.lon);
+                                            route.WayPoints.push(wayPoint);
+                                        }
+                                    }
+
+                                    // unknown file
+                                    //
+                                    else {
+                                        throw new Error("unknown file format");
+                                    }
+
+                                    let dbMongo = new DbMongo(connectionString);
+                                    let userId = await dbMongo.AddRoute(route, message.chat.id)
+                                    let outMessage = `${route.RouteName} (${route.WayPoints.length} way points) has been uploaded \n userId:${userId}`;
+                                    telegramBot.sendMessage(message.chat.id, outMessage);
+                                    console.log(outMessage);
+                                }
+                                catch (e) {
+                                    let er: Error = e;
+                                    let outMessage = `unable to parse .gpx file. ${er.message}`;
+                                    telegramBot.sendMessage(message.chat.id, outMessage);
+                                    console.log(outMessage);
+                                }
 
                             });
                         })
