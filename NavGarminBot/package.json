@@ -16,7 +16,7 @@
     "@types/shortid": "0.0.29",
     "@types/xml2js": "^0.4.3",
     "express": "^4.16.3",
-    "mongodb": "^3.1.1",
+    "mongodb": "^3.1.13",
     "node-telegram-bot-api": "^0.30.0",
     "request": "^2.87.0",
     "request-promise-native": "^1.0.5",
